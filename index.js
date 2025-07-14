@@ -1,142 +1,118 @@
-// This is your WhatsApp bot code!
-// Don't worry about understanding everything - just follow along
-
+// Railway-optimized WhatsApp Bot
 const express = require('express');
-const axios = require('axios');
-
-// Create our web server
 const app = express();
-const port = process.env.PORT || 3000;
 
-// These are your secret keys from Facebook
-const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
-const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
-const WEBHOOK_VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN || 'my_secret_token_123';
+// Railway sets the PORT automatically - we just need to use it
+const port = process.env.PORT || 8080;
 
-// This lets our server understand JSON messages
 app.use(express.json());
 
-// STEP 1: This is what Facebook calls to verify our bot is real
+// Add this to help with Railway's health checks
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+    next();
+});
+
+// Webhook verification for Facebook
 app.get('/webhook', (req, res) => {
-    console.log('Facebook is trying to verify our webhook!');
+    console.log('🔍 Webhook verification request received!');
+    console.log('Full URL:', req.url);
+    console.log('Query params:', req.query);
     
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
-
-    // Check if Facebook sent the right password
-    if (mode === 'subscribe' && token === WEBHOOK_VERIFY_TOKEN) {
+    
+    console.log(`Mode: ${mode}`);
+    console.log(`Token received: ${token}`);
+    console.log(`Challenge: ${challenge}`);
+    
+    // Check if Facebook sent the right info
+    if (mode === 'subscribe' && token === 'my_secret_token_123') {
         console.log('✅ Webhook verified successfully!');
         res.status(200).send(challenge);
     } else {
         console.log('❌ Webhook verification failed');
-        res.status(403).send('Forbidden');
+        console.log('Expected token: my_secret_token_123');
+        console.log('Received token:', token);
+        res.status(403).send('Verification failed');
     }
 });
 
-// STEP 2: This receives messages from WhatsApp
-app.post('/webhook', (req, res) => {
-    console.log('📱 Received a message from WhatsApp!');
-    
-    const body = req.body;
-
-    // Check if this is a WhatsApp message
-    if (body.object === 'whatsapp_business_account') {
-        // Look through all the messages we received
-        body.entry.forEach(entry => {
-            entry.changes.forEach(change => {
-                if (change.field === 'messages') {
-                    const messages = change.value.messages;
-                    if (messages) {
-                        messages.forEach(message => {
-                            handleIncomingMessage(message);
-                        });
-                    }
-                }
-            });
-        });
-    }
-
-    res.status(200).send('OK');
-});
-
-// STEP 3: This function decides how to reply to messages
-async function handleIncomingMessage(message) {
-    const from = message.from; // Who sent the message
-    const messageText = message.text?.body || ''; // What they said
-    
-    console.log(`💬 Message from ${from}: "${messageText}"`);
-
-    // Decide what to reply based on what they said
-    let replyMessage = '';
-    
-    if (messageText.toLowerCase().includes('hello') || messageText.toLowerCase().includes('hi')) {
-        replyMessage = '👋 Hello! Welcome to our business. How can I help you today?';
-    } 
-    else if (messageText.toLowerCase().includes('help')) {
-        replyMessage = `🤖 I'm a bot that can help you with:
-• Say "hello" to get started
-• Say "hours" for business hours  
-• Say "location" for our address
-• Say "contact" to speak with a human`;
-    }
-    else if (messageText.toLowerCase().includes('hours')) {
-        replyMessage = '🕐 Our business hours are:\nMonday-Friday: 9AM-6PM\nSaturday: 10AM-4PM\nSunday: Closed';
-    }
-    else if (messageText.toLowerCase().includes('location')) {
-        replyMessage = '📍 We are located at:\n123 Business Street\nCity, State 12345';
-    }
-    else if (messageText.toLowerCase().includes('contact')) {
-        replyMessage = '📞 To speak with a human, call us at (555) 123-4567 or email info@business.com';
-    }
-    else {
-        replyMessage = '🤖 Thanks for your message! Type "help" to see what I can do, or someone will get back to you soon.';
-    }
-
-    // Send our reply back to WhatsApp
-    await sendWhatsAppMessage(from, replyMessage);
-}
-
-// STEP 4: This function sends messages back to WhatsApp
-async function sendWhatsAppMessage(to, message) {
-    try {
-        console.log(`📤 Sending reply to ${to}: "${message}"`);
-        
-        const response = await axios.post(
-            `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`,
-            {
-                messaging_product: 'whatsapp',
-                to: to,
-                text: { body: message }
-            },
-            {
-                headers: {
-                    'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
-
-        console.log('✅ Message sent successfully!');
-    } catch (error) {
-        console.error('❌ Error sending message:', error.response?.data || error.message);
-    }
-}
-
-// STEP 5: A simple webpage to test if our bot is working
+// Home page - this should work when you visit your Railway URL
 app.get('/', (req, res) => {
     res.send(`
-        <h1>🤖 WhatsApp Bot is Running!</h1>
-        <p>Your bot is working and ready to receive messages.</p>
-        <p>Webhook URL: <code>${req.protocol}://${req.get('host')}/webhook</code></p>
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>WhatsApp Bot</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; }
+                .status { color: green; }
+                .url { background: #f0f0f0; padding: 10px; border-radius: 5px; }
+            </style>
+        </head>
+        <body>
+            <h1>🤖 WhatsApp Bot is Running!</h1>
+            <p class="status">✅ Server is online and ready</p>
+            <p><strong>Webhook URL:</strong></p>
+            <div class="url">${req.protocol}://${req.get('host')}/webhook</div>
+            <p><strong>Test webhook manually:</strong></p>
+            <div class="url">
+                <a href="/webhook?hub.mode=subscribe&hub.verify_token=my_secret_token_123&hub.challenge=test123">
+                    Click here to test webhook
+                </a>
+            </div>
+            <p><strong>Server Info:</strong></p>
+            <ul>
+                <li>Port: ${port}</li>
+                <li>Host: ${req.get('host')}</li>
+                <li>Time: ${new Date().toISOString()}</li>
+            </ul>
+        </body>
+        </html>
     `);
 });
 
-// STEP 6: Start our server
-app.listen(port, () => {
-    console.log(`🚀 WhatsApp bot server is running on port ${port}`);
-    console.log(`📡 Webhook URL: http://localhost:${port}/webhook`);
+// Handle incoming WhatsApp messages
+app.post('/webhook', (req, res) => {
+    console.log('📱 Received webhook POST request');
+    console.log('Body:', JSON.stringify(req.body, null, 2));
+    
+    // For now, just acknowledge receipt
+    res.status(200).send('OK');
 });
 
-// Export our app (needed for hosting)
+// Health check endpoint (Railway sometimes uses this)
+app.get('/health', (req, res) => {
+    res.status(200).json({ 
+        status: 'healthy', 
+        timestamp: new Date().toISOString(),
+        port: port
+    });
+});
+
+// Catch-all route for debugging
+app.use('*', (req, res) => {
+    console.log(`🔍 Unhandled request: ${req.method} ${req.originalUrl}`);
+    res.status(404).send(`
+        <h1>404 - Not Found</h1>
+        <p>Path: ${req.originalUrl}</p>
+        <p><a href="/">Go back to home</a></p>
+    `);
+});
+
+// Start the server
+app.listen(port, '0.0.0.0', () => {
+    console.log(`🚀 Server running on port ${port}`);
+    console.log(`🌐 Server should be accessible at your Railway URL`);
+    console.log(`📡 Webhook endpoint: /webhook`);
+});
+
+// Handle graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('👋 Received SIGTERM, shutting down gracefully');
+    process.exit(0);
+});
+
 module.exports = app;
